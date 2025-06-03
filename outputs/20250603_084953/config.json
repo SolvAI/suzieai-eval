@@ -1,0 +1,19 @@
+{
+  "PG_USERNAME": "postgres",
+  "PG_PASSWORD": "tobedetermined",
+  "PG_DATABASE": "suzie",
+  "PG_HOST": "localhost",
+  "PG_PORT": "5432",
+  "FILE_SIZE_LIMIT": "50",
+  "ALLOWED_DOCUMENT_TYPES": "txt",
+  "TEI_API_BASE": "http://86.110.45.75:8080/embed",
+  "RAG_CHUNK_SIZE": "768",
+  "RAG_CHUNK_OVERLAP": "200",
+  "EMBEDDING_DIM": "1024",
+  "VLLM_API_BASE": "http://86.110.45.75:8000/v1",
+  "VLLM_API_KEY": "",
+  "VECTORDB_API_BASE": "localhost",
+  "VLLM_MODEL": "JunHowie/Qwen3-14B-GPTQ-Int4",
+  "VLLM_CONTEXT": "8192",
+  "LLM_ENGINE": "vllm"
+}
