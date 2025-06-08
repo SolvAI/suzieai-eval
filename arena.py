@@ -26,24 +26,30 @@ st.set_page_config(page_title="SuzieAI : Evaluation automatique à échelle", pa
 
 st.title("📊 SuzieAI : Evaluation automatique à échelle")
 
-# ... existing code ...
-
 sessions = get_sessions(OUTPUTS_ROOT)
 if not sessions:
     st.warning("No sessions found in ./outputs/")
     st.stop()
 
-# --- Compute summary metrics over all sessions ---
-session_for_metrics = sessions[0] if sessions else None
-results_for_avg = load_results(session_for_metrics) if session_for_metrics else []
-n_results = len(results_for_avg)
+# --- Show session selectbox ---
+session = st.selectbox(
+    "Sélectionnez une session (par date):", 
+    options=sessions,
+    format_func=lambda x: x
+)
+
+results = load_results(session)
+total = len(results)
+
+# --- Compute summary metrics for the selected session ---
+n_results = len(results)
 
 if n_results > 0:
     # Collect metrics
-    all_cos = [float(ex.get("cosine_similarity", 0.0)) for ex in results_for_avg]
-    all_bleu = [float(ex.get("bleu", 0.0)) for ex in results_for_avg]
+    all_cos = [float(ex.get("cosine_similarity", 0.0)) for ex in results]
+    all_bleu = [float(ex.get("bleu", 0.0)) for ex in results]
     all_rouge1r = []
-    for ex in results_for_avg:
+    for ex in results:
         rouge = ex.get("rouge", {})
         rouge_1 = rouge.get("rouge-1", {}) if isinstance(rouge, dict) else {}
         all_rouge1r.append(float(rouge_1.get("r", 0.0)))
@@ -53,7 +59,7 @@ if n_results > 0:
 
     # Judge rates
     count_labels = {"correcte": 0, "partielle": 0, "incorrecte": 0}
-    for ex in results_for_avg:
+    for ex in results:
         lbl = ex.get('judge', {}).get('label', None)
         if lbl in count_labels: count_labels[lbl] += 1
     pct_total = lambda c: 100.0 * c / n_results if n_results else 0.0
@@ -65,32 +71,26 @@ if n_results > 0:
         f'<span style="color:orange;font-weight:bold">{pct_part:.0f} %</span> / '
         f'<span style="color:red;font-weight:bold">{pct_incorr:.0f} %</span>'
     )
+    # Overall precision with PARTIAL counted as 0.75
+    overall_precision = pct_corr + 0.75 * pct_part
 else:
     avg_cos = avg_bleu = avg_rouge1r = 0.0
     label_summary_html = "---"
+    overall_precision = 0.0
 
-# --- Display session averages above session select ---
-sum0, sum1, sum2, sum3 = st.columns(4)
+# --- Display session averages above session details ---
+sum0, sum1, sum2, sum3, sum4 = st.columns([1, 1, 1, 1, 1])
 with sum0:
-    st.markdown("**Réponses LLM :**<br>" + label_summary_html, unsafe_allow_html=True, help="Pourcentage de réponses jugées correcte (vert), partielle (orange), incorrecte (rouge) par le LLM sur l'ensemble de la session")
+    st.markdown("**Réponses LLM :**<br>" + label_summary_html, unsafe_allow_html=True,
+                help="Pourcentage de réponses jugées correcte (vert), partielle (orange), incorrecte (rouge) par le LLM sur l'ensemble de la session")
 with sum1:
     st.metric("Cosine Sim. (moy)", f"{avg_cos*100:.1f} %", help="Moyenne de la similarité sémantique entre chaque réponse générée et attendue (plus proche de 100% = plus similaire en sens)")
 with sum2:
     st.metric("BLEU (moy)", f"{avg_bleu*100:.1f} %", help="Moyenne de la similarité de phrases (corrélation par mots, 100% = identique)")
 with sum3:
     st.metric("ROUGE-1 Recall (moy)", f"{avg_rouge1r*100:.1f} %", help="Moyenne du taux de correspondance des mots du texte attendu trouvés dans la réponse générée")
-
-# --- Continue as before: show session picker, example details, etc ---
-session = st.selectbox(
-    "Sélectionnez une session (par date):", 
-    options=sessions,
-    format_func=lambda x: x
-)
-
-results = load_results(session)
-total = len(results)
-
-# ... rest of code unchanged ...
+with sum4:
+    st.metric("Précision Globale", f"{overall_precision:.1f} %", help="Score synthétique : correcte + 0,75 × partielle")
 
 if 'current_idx' not in st.session_state:
     st.session_state['current_idx'] = 0
@@ -136,7 +136,8 @@ label_html = f'<span style="color:{color}; font-weight:bold; font-size:2.0em;">{
 # 4 columns: 1st = judge label, then metrics
 c0, c1, c2, c3 = st.columns(4)
 with c0:
-    st.markdown("**Réponse évaluée comme :**<br>" + label_html, unsafe_allow_html=True, help="Evaluation d'un LLM de la réponse générée par rapport à la réponse attendue (à mitiger avec son propre jugement)")
+    st.markdown("**Réponse évaluée comme :**<br>" + label_html, unsafe_allow_html=True,
+                help="Evaluation d'un LLM de la réponse générée par rapport à la réponse attendue (à mitiger avec son propre jugement)")
 with c1:
     st.metric(label="Cosine Similarity (%)", value=cos_sim_pct, help="Proximité sémantique (plus proche de 100% = plus similaire en sens)")
 with c2:
@@ -144,8 +145,11 @@ with c2:
 with c3:
     st.metric(label="ROUGE-1 Recall (%)", value=rouge1_r_pct, help="Taux de correspondance des mots du texte attendu trouvés dans la réponse générée, (100% = identique)")
 
-st.markdown("#### 🤖 Réponse générée")
-st.code(ex["output_inference"], language="markdown")
+st.markdown("#### 🤖 Réponse générée :")
+
+st.text("____________________________________________________________________________________________________________________________________")
+st.markdown(ex["output_inference"], unsafe_allow_html=True)
+st.text("____________________________________________________________________________________________________________________________________")
 
 if "judge" in ex:
     st.markdown("**Justification de l'évaluation LLM :**")
